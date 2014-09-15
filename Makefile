@@ -7,18 +7,17 @@ endif
 .PHONY: build push clean test
 
 build:
-	docker build ${NOCACHEFLAG} -t planitar/fake-s3 .
+	docker build ${NOCACHEFLAG} -t planitar/fakes3 .
 
 push:
-	docker push planitar/fake-s3
+	docker push planitar/fakes3
 
 clean:
-	docker rmi -f planitar/fake-s3 || true
+	docker rmi -f planitar/fakes3 || true
 	rm -rf bin
 
 test: bin/test
-	docker run -d --name test-fakes3 -v `pwd`:/s3 -p 4567:4567 \
-	  planitar/fake-s3
+	docker run -d --name test-fakes3 -v `pwd`:/s3 -p :4567 planitar/fakes3
 	sleep 3s
 	./bin/test; \
 	res=$$?; \
@@ -32,6 +31,6 @@ test: bin/test
 bin/test:
 	mkdir -p bin
 	docker run --rm -v `pwd`/bin:/out planitar/dev-go /bin/bash -lc ' \
-	  go get "github.com/PlanitarInc/docker-image-fake-s3" && \
-	  cp $$GOPATH/bin/docker-image-fake-s3 /out/test \
+	  go get "github.com/PlanitarInc/docker-image-fakes3" && \
+	  cp $$GOPATH/bin/docker-image-fakes3 /out/test \
 	'

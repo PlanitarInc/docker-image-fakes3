@@ -19,6 +19,9 @@ clean:
 test: bin/test
 	docker run -d --name test-fakes3 -v `pwd`:/s3 -p :4567 planitar/fakes3
 	sleep 3s
+	export PORT=`docker inspect \
+	  -f '{{ (index (index .NetworkSettings.Ports "4567/tcp") 0).HostPort }}' \
+	  test-fakes3`; \
 	./bin/test; \
 	res=$$?; \
 	if [ $$res -ne 0 ]; then \

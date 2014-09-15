@@ -28,7 +28,7 @@ test: bin/test
 	fi
 	docker rm -f test-fakes3
 
-bin/test:
+bin/test: test.go
 	mkdir -p bin
 	docker run --rm -v `pwd`/bin:/out planitar/dev-go /bin/bash -lc ' \
 	  go get "github.com/PlanitarInc/docker-image-fakes3" && \

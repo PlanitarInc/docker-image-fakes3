@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/crowdmob/goamz/aws"
 	"github.com/crowdmob/goamz/s3"
@@ -9,9 +10,17 @@ import (
 
 var (
 	fakes3host = "localhost"
-	fakes3port = "4567"
+	fakes3port = getenv("PORT", "4567")
 	bucketname = "testbucket"
 )
+
+func getenv(key, defval string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		return defval
+	}
+	return val
+}
 
 func main() {
 	auth := aws.Auth{

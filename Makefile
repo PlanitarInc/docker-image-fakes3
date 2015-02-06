@@ -23,7 +23,8 @@ test: bin/test
 	export PORT=`docker inspect \
 	  -f '{{ (index (index .NetworkSettings.Ports "4567/tcp") 0).HostPort }}' \
 	  test-fakes3`; \
-	./bin/test; \
+	docker run --rm -ti -v `pwd`/bin:/in --net host planitar/base \
+	  /in/test; \
 	res=$$?; \
 	if [ $$res -ne 0 ]; then \
 	  docker logs test-fakes3; \

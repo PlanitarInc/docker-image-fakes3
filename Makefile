@@ -35,7 +35,10 @@ test: bin/test
 
 bin/test: test.go
 	mkdir -p bin
-	docker run --rm -v `pwd`/bin:/out planitar/dev-go /bin/bash -lc ' \
-	  go get "github.com/PlanitarInc/docker-image-fakes3" && \
-	  cp $$GOPATH/bin/docker-image-fakes3 /out/test \
+	docker run --rm \
+	  -v `pwd`:/src \
+	  -v `pwd`/bin:/out \
+	  planitar/dev-go /bin/bash -lc ' \
+	    pkg="github.com/PlanitarInc/docker-image-fakes3"; \
+	    gobldcp $$pkg docker-image-fakes3 /out/test; \
 	'

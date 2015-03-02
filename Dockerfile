@@ -1,8 +1,7 @@
-FROM planitar/dev-base
+FROM planitar/dev-ruby
 
 USER root
 
-RUN apt-get install -y ruby ruby-dev && apt-get clean
 RUN gem install fakes3
 
 EXPOSE 4567

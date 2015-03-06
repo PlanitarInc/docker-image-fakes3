@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	fakes3host = "localhost"
+	fakes3host = getenv("HOST", "172.17.42.1")
 	fakes3port = getenv("PORT", "4567")
 	bucketname = "testbucket"
 )

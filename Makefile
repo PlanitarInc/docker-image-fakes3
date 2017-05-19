@@ -23,20 +23,7 @@ clean:
 	rm -rf bin
 
 test: bin/test
-	docker run -d --name test-fakes3 -p :4567 ${IMAGE_NAME}
-	sleep 3s
-	export PORT=`docker inspect \
-	  -f '{{ (index (index .NetworkSettings.Ports "4567/tcp") 0).HostPort }}' \
-	  test-fakes3`; \
-	docker run --rm -ti -v `pwd`/bin:/in --net host \
-	  -e PORT=$$PORT planitar/base /in/test; \
-	res=$$?; \
-	if [ $$res -ne 0 ]; then \
-	  docker logs test-fakes3; \
-	  docker rm -f test-fakes3; \
-	  false; \
-	fi
-	docker rm -f test-fakes3
+	IMAGE_NAME=${IMAGE_NAME} ./test.sh
 
 bin/test: test.go
 	mkdir -p bin

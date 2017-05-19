@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/crowdmob/goamz/aws"
-	"github.com/crowdmob/goamz/s3"
+	"github.com/AdRoll/goamz/aws"
+	"github.com/AdRoll/goamz/s3"
 )
 
 var (
-	fakes3host = getenv("HOST", "172.17.42.1")
+	fakes3host = getenv("HOST", "172.17.0.1")
 	fakes3port = getenv("PORT", "4567")
 	bucketname = "testbucket"
 )

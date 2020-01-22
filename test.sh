@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+set -e
 
 docker run -d --name test-fakes3 -p :4567 ${IMAGE_NAME}
 

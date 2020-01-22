@@ -25,12 +25,12 @@ clean:
 test: bin/test
 	IMAGE_NAME=${IMAGE_NAME} ./test.sh
 
-bin/test: test.go
+bin/test: test-bin/main.go
 	mkdir -p bin
 	docker run --rm \
 	  -v `pwd`:/src \
 	  -v `pwd`/bin:/out \
-	  planitar/dev-go /bin/bash -lc ' \
-	    pkg="github.com/PlanitarInc/docker-image-fakes3"; \
-	    gobldcp $$pkg docker-image-fakes3 /out/test; \
-	'
+	  planitar/dev-go bash -c ' \
+	    cd /src/test-bin/; \
+	    go build -o /out/test .; \
+	  '

@@ -60,6 +60,10 @@ func main() {
 	if err := testDeleteObjects(bucket); err != nil {
 		panic(err.Error())
 	}
+
+	if err := testListEmptyDelimiter(bucket); err != nil {
+		panic(err.Error())
+	}
 }
 
 func testPutGet(b *s3.Bucket) error {
@@ -174,7 +178,7 @@ func testDeleteObjects(b *s3.Bucket) error {
 		return fmt.Errorf("cannot list files: %w", err)
 	}
 
-	if err := assertListResp(res, []string{
+	if err := assertListRespKeys(res, []string{
 		"multi-del/a.txt",
 		"multi-del/b.txt",
 		"multi-del/c.txt",
@@ -199,7 +203,7 @@ func testDeleteObjects(b *s3.Bucket) error {
 		return fmt.Errorf("cannot list files: %w", err)
 	}
 
-	if err := assertListResp(res, []string{
+	if err := assertListRespKeys(res, []string{
 		"multi-del/a.txt",
 		"multi-del/c.txt",
 		"multi-del/d.txt",
@@ -225,11 +229,11 @@ func testDeleteObjects(b *s3.Bucket) error {
 		return fmt.Errorf("cannot list files: %w", err)
 	}
 
-	if err := assertListResp(res, []string{
+	if err := assertListRespKeys(res, []string{
 		"multi-del/c.txt",
 		"multi-del/d.txt",
 	}); err != nil {
-		return fmt.Errorf("list initial files: %w", err)
+		return fmt.Errorf("list remaining files: %w", err)
 	}
 
 	// Remove the rest of the files. Success should be reported.
@@ -248,14 +252,103 @@ func testDeleteObjects(b *s3.Bucket) error {
 		return fmt.Errorf("cannot list files: %w", err)
 	}
 
-	if err := assertListResp(res, []string{}); err != nil {
+	if err := assertListRespKeys(res, []string{}); err != nil {
+		return fmt.Errorf("list final files: %w", err)
+	}
+
+	return nil
+}
+
+func testListEmptyDelimiter(b *s3.Bucket) error {
+	var err error
+
+	err = b.Put("empty-del/a.txt", []byte("1"), "text/plain",
+		s3.BucketOwnerFull, s3.Options{})
+	if err != nil {
+		return fmt.Errorf("cannot write 'a.txt': %w", err)
+	}
+
+	err = b.Put("empty-del/one/b.txt", []byte("2"), "text/plain",
+		s3.BucketOwnerFull, s3.Options{})
+	if err != nil {
+		return fmt.Errorf("cannot write 'a.txt': %w", err)
+	}
+
+	err = b.Put("empty-del/one/c.txt", []byte("3"), "text/plain",
+		s3.BucketOwnerFull, s3.Options{})
+	if err != nil {
+		return fmt.Errorf("cannot write 'a.txt': %w", err)
+	}
+
+	err = b.Put("empty-del/one/two/d.txt", []byte("4"), "text/plain",
+		s3.BucketOwnerFull, s3.Options{})
+	if err != nil {
+		return fmt.Errorf("cannot write 'a.txt': %w", err)
+	}
+
+	err = b.Put("empty-del/f/o/u/r/e.txt", []byte("5"), "text/plain",
+		s3.BucketOwnerFull, s3.Options{})
+	if err != nil {
+		return fmt.Errorf("cannot write 'a.txt': %w", err)
+	}
+
+	err = b.Put("empty-del/f/o/u/r/f.txt", []byte("6"), "text/plain",
+		s3.BucketOwnerFull, s3.Options{})
+	if err != nil {
+		return fmt.Errorf("cannot write 'a.txt': %w", err)
+	}
+
+	err = b.Put("empty-del/g.txt", []byte("7"), "text/plain",
+		s3.BucketOwnerFull, s3.Options{})
+	if err != nil {
+		return fmt.Errorf("cannot write 'a.txt': %w", err)
+	}
+
+	// Delimiter is set to '/', only elements
+	res, err := b.List("empty-del/", "/", "", 100)
+	if err != nil {
+		return fmt.Errorf("cannot list files: %w", err)
+	}
+
+	if err := assertListRespKeys(res, []string{
+		"empty-del/a.txt",
+		"empty-del/g.txt",
+	}); err != nil {
+		return fmt.Errorf("list initial files: %w", err)
+	}
+
+	if err := assertListRespCommonPrefixes(res, []string{
+		"empty-del/f/",
+		"empty-del/one/",
+	}); err != nil {
+		return fmt.Errorf("list initial files: %w", err)
+	}
+
+	res, err = b.List("empty-del/", "", "", 100)
+	if err != nil {
+		return fmt.Errorf("cannot list files: %w", err)
+	}
+
+	if err := assertListRespKeys(res, []string{
+		"empty-del/a.txt",
+		"empty-del/f/o/u/r/e.txt",
+		"empty-del/f/o/u/r/f.txt",
+		"empty-del/g.txt",
+		"empty-del/one/b.txt",
+		"empty-del/one/c.txt",
+		"empty-del/one/two/d.txt",
+	}); err != nil {
+		return fmt.Errorf("list initial files: %w", err)
+	}
+
+	if err := assertListRespCommonPrefixes(res, nil); err != nil {
 		return fmt.Errorf("list initial files: %w", err)
 	}
 
 	return nil
 }
 
-func assertListResp(res *s3.ListResp, expKeys []string) error {
+func assertListRespKeys(res *s3.ListResp, expKeys []string) error {
 	keys := make([]string, 0, len(res.Contents))
 	for _, k := range res.Contents {
 		keys = append(keys, k.Key)
@@ -266,12 +359,28 @@ func assertListResp(res *s3.ListResp, expKeys []string) error {
 		return nil
 	}
 
-	return fmt.Errorf(`unexpected list result:
+	return fmt.Errorf(`unexpected keys in list result:
 
-  actual keys:   %v
-  expected keys: %v
+  actual:   %v
+  expected: %v
 
   diff:
 %s
 `, keys, expKeys, d)
+}
+
+func assertListRespCommonPrefixes(res *s3.ListResp, expPrefixes []string) error {
+	d := cmp.Diff(res.CommonPrefixes, expPrefixes)
+	if d == "" {
+		return nil
+	}
+
+	return fmt.Errorf(`unexpected common-prefixes in list result:
+
+  actual:   %v
+  expected: %v
+
+  diff:
+%s
+`, res.CommonPrefixes, expPrefixes, d)
 }

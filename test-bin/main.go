@@ -7,6 +7,7 @@ import (
 
 	"github.com/AdRoll/goamz/aws"
 	"github.com/AdRoll/goamz/s3"
+	"github.com/google/go-cmp/cmp"
 )
 
 var (
@@ -53,6 +54,10 @@ func main() {
 	}
 
 	if err := testCopyObject404(bucket); err != nil {
+		panic(err.Error())
+	}
+
+	if err := testDeleteObjects(bucket); err != nil {
 		panic(err.Error())
 	}
 }
@@ -129,4 +134,144 @@ func testCopyObject404(b *s3.Bucket) error {
 	}
 
 	return nil
+}
+
+func testDeleteObjects(b *s3.Bucket) error {
+	var err error
+
+	err = b.Put("multi-del/a.txt", []byte("1"), "text/plain",
+		s3.BucketOwnerFull, s3.Options{})
+	if err != nil {
+		return fmt.Errorf("cannot write 'a.txt': %w", err)
+	}
+
+	err = b.Put("multi-del/b.txt", []byte("2"), "text/plain",
+		s3.BucketOwnerFull, s3.Options{})
+	if err != nil {
+		return fmt.Errorf("cannot write 'a.txt': %w", err)
+	}
+
+	err = b.Put("multi-del/c.txt", []byte("3"), "text/plain",
+		s3.BucketOwnerFull, s3.Options{})
+	if err != nil {
+		return fmt.Errorf("cannot write 'a.txt': %w", err)
+	}
+
+	err = b.Put("multi-del/d.txt", []byte("4"), "text/plain",
+		s3.BucketOwnerFull, s3.Options{})
+	if err != nil {
+		return fmt.Errorf("cannot write 'a.txt': %w", err)
+	}
+
+	err = b.Put("multi-del/e.txt", []byte("4"), "text/plain",
+		s3.BucketOwnerFull, s3.Options{})
+	if err != nil {
+		return fmt.Errorf("cannot write 'a.txt': %w", err)
+	}
+
+	res, err := b.List("multi-del/", "/", "", 100)
+	if err != nil {
+		return fmt.Errorf("cannot list files: %w", err)
+	}
+
+	if err := assertListResp(res, []string{
+		"multi-del/a.txt",
+		"multi-del/b.txt",
+		"multi-del/c.txt",
+		"multi-del/d.txt",
+		"multi-del/e.txt",
+	}); err != nil {
+		return fmt.Errorf("list initial files: %w", err)
+	}
+
+	// Try to delete multi-del/b.txt and some version of multi-del/e.txt.
+	// Only multi-del/b.txt should be gone, multi-del/e.txt is not deleted
+	// because deleting versions is not supported.
+	if err := b.DelMulti(s3.Delete{Objects: []s3.Object{
+		{Key: "multi-del/b.txt"},
+		{Key: "multi-del/e.txt", VersionId: "v1"},
+	}}); err != nil {
+		return fmt.Errorf("cannot delete files: %w", err)
+	}
+
+	res, err = b.List("multi-del/", "/", "", 100)
+	if err != nil {
+		return fmt.Errorf("cannot list files: %w", err)
+	}
+
+	if err := assertListResp(res, []string{
+		"multi-del/a.txt",
+		"multi-del/c.txt",
+		"multi-del/d.txt",
+		"multi-del/e.txt",
+	},
+	); err != nil {
+		return fmt.Errorf("list initial files: %w", err)
+	}
+
+	// Try to delete multi-del/a.txt, multi-del/e.txt and already removed
+	// multi-del/b.txt.
+	// Success should be reported, multi-del/c.txt should be gone.
+	if err := b.DelMulti(s3.Delete{Objects: []s3.Object{
+		{Key: "multi-del/a.txt"},
+		{Key: "multi-del/b.txt"},
+		{Key: "multi-del/e.txt"},
+	}}); err != nil {
+		return fmt.Errorf("cannot delete files: %w", err)
+	}
+
+	res, err = b.List("multi-del/", "/", "", 100)
+	if err != nil {
+		return fmt.Errorf("cannot list files: %w", err)
+	}
+
+	if err := assertListResp(res, []string{
+		"multi-del/c.txt",
+		"multi-del/d.txt",
+	}); err != nil {
+		return fmt.Errorf("list initial files: %w", err)
+	}
+
+	// Remove the rest of the files. Success should be reported.
+	if err := b.DelMulti(s3.Delete{Objects: []s3.Object{
+		{Key: "multi-del/a.txt"},
+		{Key: "multi-del/b.txt"},
+		{Key: "multi-del/c.txt"},
+		{Key: "multi-del/d.txt"},
+		{Key: "multi-del/e.txt"},
+	}}); err != nil {
+		return fmt.Errorf("cannot delete files: %w", err)
+	}
+
+	res, err = b.List("multi-del/", "/", "", 100)
+	if err != nil {
+		return fmt.Errorf("cannot list files: %w", err)
+	}
+
+	if err := assertListResp(res, []string{}); err != nil {
+		return fmt.Errorf("list initial files: %w", err)
+	}
+
+	return nil
+}
+
+func assertListResp(res *s3.ListResp, expKeys []string) error {
+	keys := make([]string, 0, len(res.Contents))
+	for _, k := range res.Contents {
+		keys = append(keys, k.Key)
+	}
+
+	d := cmp.Diff(keys, expKeys)
+	if d == "" {
+		return nil
+	}
+
+	return fmt.Errorf(`unexpected list result:
+
+  actual keys:   %v
+  expected keys: %v
+
+  diff:
+%s
+`, keys, expKeys, d)
 }

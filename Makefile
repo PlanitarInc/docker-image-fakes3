@@ -1,6 +1,6 @@
 # XXX no versioning of the docker image
 IMAGE_NAME=planitar/fakes3
-PLNTR_FAKES3_VERSION=1.0.0.pre.9
+PLNTR_FAKES3_VERSION=1.0.0.pre.10
 
 ifneq ($(NOCACHE),)
   NOCACHEFLAG=--no-cache

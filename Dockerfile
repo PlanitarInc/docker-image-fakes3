@@ -4,7 +4,7 @@ USER root
 
 RUN apk add --no-cache ruby
 
-ARG PLNTR_FAKES3_VERSION=1.0.0.pre.8
+ARG PLNTR_FAKES3_VERSION
 
 # Planitar's fork of fakes3 contains additional CORS configuration.
 # There are 3 additional allowed headers:

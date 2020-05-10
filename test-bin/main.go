@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -61,6 +62,7 @@ func main() {
 	testCopyObject404(svc)
 	testListObjects(svc)
 	testDeleteObjects(svc)
+	testBigUploadDownload(svc)
 }
 
 func testPutGetDelete(svc *s3.S3) {
@@ -381,6 +383,49 @@ func testDeleteObjects(svc *s3.S3) {
 	assertListReponse(res, nil, nil)
 }
 
+func testBigUploadDownload(svc *s3.S3) {
+	const (
+		key         = "big-file"
+		contentType = "text/plain"
+	)
+	// 50MB
+	content := bytes.Repeat([]byte("123456789_"), 7*1024*1024)
+
+	u := s3manager.NewUploaderWithClient(svc)
+	_, err := u.Upload(&s3manager.UploadInput{
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(key),
+		ContentType: aws.String(contentType),
+		Body:        bytes.NewReader(content),
+		ACL:         aws.String("bucket-owner-full-control"),
+	})
+	assertOK(err)
+	defer deleteAllKeys(svc, bucket, []string{key})
+
+	res, err := svc.HeadObject(&s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	assertOK(err)
+	// XXX Not supported by fakes3
+	// assertAwsString("Content-Type", res.ContentType, contentType)
+	assertAwsInt64("Content-Length", res.ContentLength, int64(len(content)))
+
+	buf := aws.NewWriteAtBuffer([]byte{})
+	d := s3manager.NewDownloaderWithClient(svc)
+	_, err = d.Download(buf, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	assertOK(err)
+	if e, a := len(content), len(buf.Bytes()); e != a {
+		panic(fmt.Sprintf("Wrong length: expected %d, got %d", e, a))
+	}
+	if !bytes.Equal(content, buf.Bytes()) {
+		panic(fmt.Sprintf("Wrong content"))
+	}
+}
+
 type textFile struct {
 	Key, Content string
 }
@@ -454,6 +499,22 @@ func assertAwsStringNotEmpty(name string, actual *string) {
 }
 
 func assertAwsString(name string, actual *string, expected string) {
+	if actual == nil {
+		panic(fmt.Sprintf(`%s is empty:
+- expected: %q
+- actual:   <nil>
+`, name, expected))
+	}
+
+	if *actual != expected {
+		panic(fmt.Sprintf(`%s is wrong:
+- expected: %q
+- actual:   %q
+`, name, expected, *actual))
+	}
+}
+
+func assertAwsInt64(name string, actual *int64, expected int64) {
 	if actual == nil {
 		panic(fmt.Sprintf(`%s is empty:
 - expected: %q
